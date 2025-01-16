@@ -1,12 +1,12 @@
 package gophkeeper
 
 import (
+	"encoding/json"
 	"gophKeeper/internal/cookie"
 	"gophKeeper/internal/service"
 	"gophKeeper/internal/storage"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -22,9 +22,6 @@ type GophKeeper struct {
 
 	// CookieManager управляет аутентификацией и обработкой куки в приложении.
 	CookieManager cookie.CookieManagerInterface
-
-	// wg используется для управления ожидающими горутинами.
-	wg sync.WaitGroup
 }
 
 // GophKeeperInterface - интерфейс для работы с GophKeeper
@@ -107,14 +104,70 @@ func (us *GophKeeper) AddDataHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Printf("Ошибка при сохранении данныхь: %v", err)
+		log.Printf("Ошибка при сохранении данных: %v", err)
 		return
 	}
 
 	_, err = w.Write([]byte("Данные успешно сохранены!"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Printf("Ошибка при сохранении данныхь: %v", err)
+		log.Printf("Ошибка при сохранении данных: %v", err)
+		return
+	}
+}
+
+// GetDataHandler получение данных пользователя
+func (us *GophKeeper) GetDataHandler(w http.ResponseWriter, r *http.Request) {
+	userService := service.NewUserService(us.Storage)
+
+	UserDataArray, err := userService.GetData(r)
+	if err != nil {
+		log.Printf("Ошибка при получении данных: %v", err)
+		http.Error(w, "Произошла ошибка при получении данных", http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(UserDataArray); err != nil {
+		log.Printf("Ошибка при кодировании данных в JSON: %v", err)
+		http.Error(w, "Ошибка при кодировании данных", http.StatusInternalServerError)
+	}
+}
+
+// DeleteDataHandler удаление данных пользователя
+func (us *GophKeeper) DeleteDataHandler(w http.ResponseWriter, r *http.Request) {
+	userService := service.NewUserService(us.Storage)
+
+	err := userService.DeleteData(r)
+	if err != nil {
+		log.Printf("Ошибка при получении данных: %v", err)
+		http.Error(w, "Произошла ошибка при получении данных", http.StatusInternalServerError)
+	}
+
+	_, err = w.Write([]byte("Данные успешно удалены!"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("Внутренняя ошибка сервера %v", err)
+		return
+	}
+}
+
+// EditDataHandler изменение данных
+func (us *GophKeeper) EditDataHandler(w http.ResponseWriter, r *http.Request) {
+	userService := service.NewUserService(us.Storage)
+
+	err := userService.EditData(r)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("Ошибка при сохранении данных: %v", err)
+		return
+	}
+
+	_, err = w.Write([]byte("Данные успешно изменены!"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("Ошибка при изменении данных: %v", err)
 		return
 	}
 }

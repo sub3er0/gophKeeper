@@ -107,6 +107,9 @@ func initHTTPServer(
 	r := chi.NewRouter()
 	r.With(cookieManager.CookieHandler).Route("/", func(r chi.Router) {
 		r.Post("/add_data", gophKeeperInstance.AddDataHandler)
+		r.Get("/get_data", gophKeeperInstance.GetDataHandler)
+		r.Get("/delete_data", gophKeeperInstance.DeleteDataHandler)
+		r.Post("/edit_data", gophKeeperInstance.EditDataHandler)
 		//r.Post("/", gophKeeperInstance.PostHandler)
 		//r.Get("/{id}", gophKeeperInstance.GetHandler)
 		//r.Post("/api/shorten", gophKeeperInstance.JSONPostHandler)

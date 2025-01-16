@@ -65,6 +65,15 @@ type UserStorageInterface interface {
 
 	// AddData запись данных в хранилище
 	AddData(userID int, body []byte, dataType string) error
+
+	// GetData получить данные пользователя
+	GetData(userID int) ([]UserData, error)
+
+	// DeleteData удаление данных пользователя
+	DeleteData(userID int, dataID int) error
+
+	// EditData изменение данных в хранилище
+	EditData(userID int, body []byte, dataType string, dataID int) error
 }
 
 // UsersStorage предоставляет реализацию для работы с хранилищем пользователей
@@ -297,6 +306,59 @@ func (us *UsersStorage) AddData(userID int, body []byte, dataType string) error 
 
 	userData := string(body)
 	err := us.Conn.QueryRow(us.Ctx, query, userID, userData, dataType).Scan(&userID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetData запись данных в хранилище
+func (us *UsersStorage) GetData(userID int) ([]UserData, error) {
+	query := "SELECT * FROM user_data where user_id = $1"
+
+	rows, err := us.Conn.Query(us.Ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var userDataArray []UserData
+
+	for rows.Next() {
+		var userData UserData
+		if err := rows.Scan(&userData.ID, &userData.UserID, &userData.UserData, &userData.DataType); err != nil {
+			return nil, err
+		}
+		userDataArray = append(userDataArray, userData)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return userDataArray, nil
+}
+
+// DeleteData удалить данные пользователя
+func (us *UsersStorage) DeleteData(userID int, dataID int) error {
+	query := "DELETE FROM user_data WHERE user_id = $1 AND id = $2"
+
+	_, err := us.Conn.Exec(us.Ctx, query, userID, dataID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// EditData изменение данных в хранилище
+func (us *UsersStorage) EditData(userID int, body []byte, dataType string, dataID int) error {
+	query := "UPDATE user_data SET user_data = $1 WHERE id = $2 RETURNING id"
+
+	userData := string(body)
+	var updatedID int // Переменная для хранения ID обновленной строки
+	err := us.Conn.QueryRow(us.Ctx, query, userData, dataID).Scan(&updatedID)
 	if err != nil {
 		return err
 	}
