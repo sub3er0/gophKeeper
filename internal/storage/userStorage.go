@@ -2,6 +2,9 @@ package storage
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/base64"
 	"errors"
 	"github.com/jackc/pgx/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -75,6 +78,8 @@ type UserStorageInterface interface {
 	// EditData изменение данных в хранилище
 	EditData(userID int, body []byte, dataType string, dataID int) error
 }
+
+var key = []byte("thisis32bitlongpassphraseimusing")
 
 // UsersStorage предоставляет реализацию для работы с хранилищем пользователей
 // и взаимодействия с базой данных через пул соединений pgx.
@@ -305,7 +310,11 @@ func (us *UsersStorage) AddData(userID int, body []byte, dataType string) error 
 	query := "INSERT INTO user_data (user_id, user_data, data_type) VALUES ($1, $2, $3) RETURNING id"
 
 	userData := string(body)
-	err := us.Conn.QueryRow(us.Ctx, query, userID, userData, dataType).Scan(&userID)
+	userData, err := Encrypt(userData)
+	if err != nil {
+		return err
+	}
+	err = us.Conn.QueryRow(us.Ctx, query, userID, userData, dataType).Scan(&userID)
 	if err != nil {
 		return err
 	}
@@ -328,6 +337,10 @@ func (us *UsersStorage) GetData(userID int) ([]UserData, error) {
 	for rows.Next() {
 		var userData UserData
 		if err := rows.Scan(&userData.ID, &userData.UserID, &userData.UserData, &userData.DataType); err != nil {
+			return nil, err
+		}
+		userData.UserData, err = Decrypt(userData.UserData)
+		if err != nil {
 			return nil, err
 		}
 		userDataArray = append(userDataArray, userData)
@@ -364,4 +377,46 @@ func (us *UsersStorage) EditData(userID int, body []byte, dataType string, dataI
 	}
 
 	return nil
+}
+
+// Encrypt шифрует строку.
+func Encrypt(stringToEncrypt string) (string, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	// Создание вектора инициализации (IV)
+	iv := make([]byte, aes.BlockSize)
+	stream := cipher.NewCFBEncrypter(block, iv)
+
+	// Подготовка к шифрованию
+	ciphertext := make([]byte, len(stringToEncrypt))
+	stream.XORKeyStream(ciphertext, []byte(stringToEncrypt))
+
+	// Возвращаем зашифрованные данные в виде base64
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+// Decrypt расшифровывает зашифрованную строку.
+func Decrypt(stringToDecrypt string) (string, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	ciphertext, err := base64.StdEncoding.DecodeString(stringToDecrypt)
+	if err != nil {
+		return "", err
+	}
+
+	// Создание вектора инициализации (IV)
+	iv := make([]byte, aes.BlockSize)
+	stream := cipher.NewCFBDecrypter(block, iv)
+
+	// Расшифровка данных
+	plaintext := make([]byte, len(ciphertext))
+	stream.XORKeyStream(plaintext, ciphertext)
+
+	return string(plaintext), nil
 }

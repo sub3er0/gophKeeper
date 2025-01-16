@@ -7,6 +7,7 @@ import (
 	"gophKeeper/internal/config"
 	"gophKeeper/internal/cookie"
 	"gophKeeper/internal/gophkeeper"
+	"gophKeeper/internal/service"
 	"gophKeeper/internal/storage"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -45,8 +46,6 @@ func main() {
 
 	go func() {
 		<-sigint
-		// получили сигнал os.Interrupt, запускаем процедуру graceful shutdown
-
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -58,11 +57,13 @@ func main() {
 		close(idleConnsClosed)
 	}()
 
+	userService := service.NewUserService(dataUsersStorage)
 	gophKeeperInstance = &gophkeeper.GophKeeper{
 		Storage:       dataUsersStorage,
 		ServerAddress: cfg.ServerAddress,
 		BaseURL:       cfg.BaseURL,
 		CookieManager: &cookieManager,
+		UserService:   userService,
 	}
 
 	initHTTPServer(&cookieManager, cfg, server)

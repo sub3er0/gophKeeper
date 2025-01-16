@@ -42,13 +42,17 @@ func (cs *Configuration) InitConfig() (*ConfigData, error) {
 	}
 
 	file, err := os.Open(configFile)
+
 	if err != nil {
 		log.Printf("Warning: Error opening config file: %v. Using default configuration.\n", err)
-	}
-	defer file.Close()
+	} else {
+		isParsed = true
+		defer file.Close()
 
-	if err := json.NewDecoder(file).Decode(cfg); err != nil {
-		log.Printf("Warning: Error decoding config file: %v. Using default configuration.\n", err)
+		if err = json.NewDecoder(file).Decode(cfg); err != nil {
+			log.Printf("Warning: Error decoding config file: %v. Using default configuration.\n", err)
+			return nil, err
+		}
 	}
 
 	if !isParsed {

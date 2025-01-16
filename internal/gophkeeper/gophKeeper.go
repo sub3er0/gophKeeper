@@ -22,6 +22,9 @@ type GophKeeper struct {
 
 	// CookieManager управляет аутентификацией и обработкой куки в приложении.
 	CookieManager cookie.CookieManagerInterface
+
+	// UserService сервис для бизнес лоигки
+	UserService service.UserServiceInterface
 }
 
 // GophKeeperInterface - интерфейс для работы с GophKeeper
@@ -46,12 +49,10 @@ func (us *GophKeeper) PingHandler(w http.ResponseWriter, r *http.Request) {
 
 // RegistrationHandler Регистрация нового пользователя
 func (us *GophKeeper) RegistrationHandler(w http.ResponseWriter, r *http.Request) {
-	userService := service.NewUserService(us.Storage)
-
-	newCookieValue, err := userService.Registration(r)
+	newCookieValue, err := us.UserService.Registration(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		log.Printf("Ошибка при создании нового шифра: %v", err)
+		log.Printf("Ошибка при создании нового пользователя: %v", err)
 		return
 	}
 
@@ -74,9 +75,7 @@ func (us *GophKeeper) RegistrationHandler(w http.ResponseWriter, r *http.Request
 
 // AuthenticationHandler Регистрация нового пользователя
 func (us *GophKeeper) AuthenticationHandler(w http.ResponseWriter, r *http.Request) {
-	userService := service.NewUserService(us.Storage)
-
-	cookieValue, err := userService.Authentication(r)
+	cookieValue, err := us.UserService.Authentication(r)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -98,9 +97,7 @@ func (us *GophKeeper) AuthenticationHandler(w http.ResponseWriter, r *http.Reque
 
 // AddDataHandler Добавление данных
 func (us *GophKeeper) AddDataHandler(w http.ResponseWriter, r *http.Request) {
-	userService := service.NewUserService(us.Storage)
-
-	err := userService.AddData(r)
+	err := us.UserService.AddData(r)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -118,9 +115,7 @@ func (us *GophKeeper) AddDataHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetDataHandler получение данных пользователя
 func (us *GophKeeper) GetDataHandler(w http.ResponseWriter, r *http.Request) {
-	userService := service.NewUserService(us.Storage)
-
-	UserDataArray, err := userService.GetData(r)
+	UserDataArray, err := us.UserService.GetData(r)
 	if err != nil {
 		log.Printf("Ошибка при получении данных: %v", err)
 		http.Error(w, "Произошла ошибка при получении данных", http.StatusInternalServerError)
@@ -136,12 +131,11 @@ func (us *GophKeeper) GetDataHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeleteDataHandler удаление данных пользователя
 func (us *GophKeeper) DeleteDataHandler(w http.ResponseWriter, r *http.Request) {
-	userService := service.NewUserService(us.Storage)
-
-	err := userService.DeleteData(r)
+	err := us.UserService.DeleteData(r)
 	if err != nil {
 		log.Printf("Ошибка при получении данных: %v", err)
 		http.Error(w, "Произошла ошибка при получении данных", http.StatusInternalServerError)
+		return
 	}
 
 	_, err = w.Write([]byte("Данные успешно удалены!"))
@@ -154,9 +148,7 @@ func (us *GophKeeper) DeleteDataHandler(w http.ResponseWriter, r *http.Request) 
 
 // EditDataHandler изменение данных
 func (us *GophKeeper) EditDataHandler(w http.ResponseWriter, r *http.Request) {
-	userService := service.NewUserService(us.Storage)
-
-	err := userService.EditData(r)
+	err := us.UserService.EditData(r)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

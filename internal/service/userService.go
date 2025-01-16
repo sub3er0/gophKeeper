@@ -21,6 +21,15 @@ type UserService struct {
 	Storage storage.UserStorageInterface
 }
 
+type UserServiceInterface interface {
+	Registration(r *http.Request) (string, error)
+	Authentication(r *http.Request) (string, error)
+	AddData(r *http.Request) error
+	GetData(r *http.Request) ([]storage.UserData, error)
+	DeleteData(r *http.Request) error
+	EditData(r *http.Request) error
+}
+
 // NewUserService Конструктор для создания экземпляра UserService
 func NewUserService(storage storage.UserStorageInterface) *UserService {
 	return &UserService{
@@ -43,7 +52,7 @@ func (us *UserService) Registration(r *http.Request) (string, error) {
 
 	_, err = us.Storage.GetUserID(requestBody.Login)
 	if err == nil {
-		return "", nil // Пользователь уже существует
+		return "", errors.New("пользователь существует")
 	}
 
 	err = us.Storage.BeginTransaction()
@@ -66,7 +75,7 @@ func (us *UserService) Registration(r *http.Request) (string, error) {
 	}
 
 	userIDStr := fmt.Sprintf("%d", userID)
-	encryptedUserID, err := cookie.Encrypt(userIDStr)
+	encryptedUserID, err := storage.Encrypt(userIDStr)
 	if err != nil {
 		return "", err
 	}
@@ -119,7 +128,7 @@ func (us *UserService) Authentication(r *http.Request) (string, error) {
 	}
 
 	userIDStr := fmt.Sprintf("%d", userID)
-	encryptedUserID, err := cookie.Encrypt(userIDStr)
+	encryptedUserID, err := storage.Encrypt(userIDStr)
 	if err != nil {
 		return "", err
 	}
@@ -151,7 +160,7 @@ func (us *UserService) AddData(r *http.Request) error {
 		return err
 	}
 	userIDString, _ := cookie.GetUserIDFromCookie(userCookie.Value)
-	userID, err := cookie.Decrypt(userIDString)
+	userID, err := storage.Decrypt(userIDString)
 	if err != nil {
 		return err
 	}
@@ -179,7 +188,7 @@ func (us *UserService) GetData(r *http.Request) ([]storage.UserData, error) {
 		return nil, err
 	}
 	userIDString, _ := cookie.GetUserIDFromCookie(userCookie.Value)
-	userID, err := cookie.Decrypt(userIDString)
+	userID, err := storage.Decrypt(userIDString)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +214,7 @@ func (us *UserService) DeleteData(r *http.Request) error {
 		return err
 	}
 	userIDString, _ := cookie.GetUserIDFromCookie(userCookie.Value)
-	userID, err := cookie.Decrypt(userIDString)
+	userID, err := storage.Decrypt(userIDString)
 	if err != nil {
 		return err
 	}
@@ -241,7 +250,7 @@ func (us *UserService) EditData(r *http.Request) error {
 		return err
 	}
 	userIDString, _ := cookie.GetUserIDFromCookie(userCookie.Value)
-	userID, err := cookie.Decrypt(userIDString)
+	userID, err := storage.Decrypt(userIDString)
 	if err != nil {
 		return err
 	}

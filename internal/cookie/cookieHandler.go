@@ -1,8 +1,6 @@
 package cookie
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -11,8 +9,6 @@ import (
 	"net/http"
 	"strings"
 )
-
-var key = []byte("thisis32bitlongpassphraseimusing")
 
 // CookieManager управляет аутентификацией и обработкой куки в приложении.
 // Он предоставляет методы для установки, проверки и получения значений куки.
@@ -30,11 +26,6 @@ type CookieManagerInterface interface {
 	// CookieHandler оборачивает HTTP-обработчик для управления кукми.
 	// Возвращает обработчик, который изменён для работы с куками.
 	CookieHandler(h http.Handler) http.Handler
-
-	// AuthMiddleware оборачивает HTTP-обработчик для проверки аутентификации пользователя.
-	// Внутри проверяет наличие и корректность куки, а также существование пользователя.
-	// Если аутентификация не пройдена, возвращает статус 401 Unauthorized.
-	AuthMiddleware(h http.Handler) http.Handler
 
 	// GetActualCookieValue возвращает значение актуальной куки для текущего пользователя.
 	GetActualCookieValue() string
@@ -108,43 +99,4 @@ func (cm *CookieManager) CookieHandler(h http.Handler) http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
-}
-
-// Encrypt шифрует строку userID.
-func Encrypt(userID string) (string, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-
-	// Создание вектора инициализации (IV)
-	iv := make([]byte, aes.BlockSize)
-	stream := cipher.NewCFBEncrypter(block, iv)
-
-	// Подготовка к шифрованию
-	ciphertext := make([]byte, len(userID))
-	stream.XORKeyStream(ciphertext, []byte(userID))
-
-	// Возвращаем зашифрованные данные в виде base64
-	return base64.StdEncoding.EncodeToString(ciphertext), nil
-}
-
-// Decrypt расшифровывает зашифрованную строку.
-func Decrypt(encryptedID string) (string, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-
-	ciphertext, _ := base64.StdEncoding.DecodeString(encryptedID)
-
-	// Создание вектора инициализации (IV)
-	iv := make([]byte, aes.BlockSize)
-	stream := cipher.NewCFBDecrypter(block, iv)
-
-	// Расшифровка данных
-	plaintext := make([]byte, len(ciphertext))
-	stream.XORKeyStream(plaintext, ciphertext)
-
-	return string(plaintext), nil
 }
