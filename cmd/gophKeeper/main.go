@@ -110,14 +110,6 @@ func initHTTPServer(
 		r.Get("/get_data", gophKeeperInstance.GetDataHandler)
 		r.Get("/delete_data", gophKeeperInstance.DeleteDataHandler)
 		r.Post("/edit_data", gophKeeperInstance.EditDataHandler)
-		//r.Post("/", gophKeeperInstance.PostHandler)
-		//r.Get("/{id}", gophKeeperInstance.GetHandler)
-		//r.Post("/api/shorten", gophKeeperInstance.JSONPostHandler)
-		//r.Post("/api/shorten/batch", gophKeeperInstance.JSONBatchHandler)
-		//r.Get("/api/internal/stats", gophKeeperInstance.GetInternalStats)
-		//
-		//r.With(cookieManager.AuthMiddleware).Get("/api/user/urls", gophKeeperInstance.GetUserUrls)
-		//r.With(cookieManager.AuthMiddleware).Delete("/api/user/urls", gophKeeperInstance.DeleteUserUrls)
 	})
 
 	r.Post("/registration", gophKeeperInstance.RegistrationHandler)
