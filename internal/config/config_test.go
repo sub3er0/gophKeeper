@@ -57,6 +57,10 @@ func TestInitConfigFromEnv(t *testing.T) {
 	os.Setenv("BASE_URL", "http://example.com/")
 	os.Setenv("DATABASE_DSN", "mysql://user:pass@localhost:3306/dbname")
 
+	defer os.Unsetenv("SERVER_ADDRESS")
+	defer os.Unsetenv("BASE_URL")
+	defer os.Unsetenv("DATABASE_DSN")
+
 	// Инициализация конфигурации
 	config := Configuration{}
 	cfg, err := config.InitConfig()
@@ -72,6 +76,32 @@ func TestInitConfigFromEnv(t *testing.T) {
 	}
 	if cfg.DatabaseDsn != "mysql://user:pass@localhost:3306/dbname" {
 		t.Errorf("Ожидалось 'mysql://user:pass@localhost:3306/dbname', получено '%s'", cfg.DatabaseDsn)
+	}
+}
+
+func TestInitConfig_UsingDefaultValues(t *testing.T) {
+	isParsed = false
+	os.Unsetenv("CONFIG")
+
+	config := Configuration{}
+	cfg, err := config.InitConfig()
+
+	if err != nil {
+		t.Fatalf("Неожиданная ошибка: %v", err)
+	}
+
+	if cfg.BaseURL != "http://localhost:8080/" {
+		t.Errorf("Ожидалось 'http://localhost:8080/', получено '%s'", cfg.BaseURL)
+	}
+	if cfg.ServerAddress != "localhost:8080" {
+		t.Errorf("Ожидалось 'localhost:8080', получено '%s'", cfg.ServerAddress)
+	}
+	if cfg.DatabaseDsn != "" {
+		t.Errorf("Ожидалось '', получено '%s'", cfg.DatabaseDsn)
+	}
+
+	if !isParsed {
+		t.Error("isParsed должен быть true после инициализации")
 	}
 }
 

@@ -14,11 +14,15 @@ import (
 
 // MockUserStorage представляет собой мок для UserStorageInterface
 type MockUserStorage struct {
-	mu        sync.Mutex
-	users     map[string]int             // Хранит логин пользователя и его ID
-	cookies   map[string]int             // Хранит куки и соответствующий ID пользователя
-	userData  map[int][]storage.UserData // Хранит данные пользователей
-	userCount int                        // Счетчик пользователей для генерации ID
+	mu             sync.Mutex
+	users          map[string]int             // Хранит логин пользователя и его ID
+	cookies        map[string]int             // Хранит куки и соответствующий ID пользователя
+	userData       map[int][]storage.UserData // Хранит данные пользователей
+	userCount      int                        // Счетчик пользователей для генерации ID
+	EditDataFunc   func(userID int, body []byte, dataType string, dataID int) error
+	DeleteDataFunc func(userID int, dataID int) error
+	DecryptFunc    func(stringToDecrypt string) (string, error)
+	GetDataFunc    func(userID int) ([]storage.UserData, error)
 }
 
 // NewMockUserStorage создает новый экземпляр MockUserStorage
@@ -340,6 +344,52 @@ func TestUserService_GetData(t *testing.T) {
 	}
 }
 
+func TestUserService_GetData_NoCookie(t *testing.T) {
+	mockStorage := NewMockUserStorage()
+	userService := NewUserService(mockStorage)
+
+	req := httptest.NewRequest("GET", "/getdata", nil) // Запрос без куки
+
+	_, err := userService.GetData(req)
+	if err == nil {
+		t.Error("Expected error due to missing cookie, got none")
+	}
+}
+
+func TestUserService_GetData_InvalidUserID(t *testing.T) {
+	mockStorage := NewMockUserStorage()
+	userService := NewUserService(mockStorage)
+
+	req := httptest.NewRequest("GET", "/getdata", nil)
+	value, _ := storage.Encrypt("123")
+	req.AddCookie(&http.Cookie{Name: cookie.CookieName, Value: value}) // Устанавливаем куку
+
+	_, err := userService.GetData(req)
+	if err == nil {
+		t.Error("Expected error due to invalid userID, got none")
+	}
+}
+
+func TestUserService_GetData_InvalidDataID(t *testing.T) {
+	mockStorage := NewMockUserStorage()
+	userService := NewUserService(mockStorage)
+
+	req := httptest.NewRequest("GET", "/getdata", nil)
+	value, _ := storage.Encrypt("123")
+	value = value + ".123"
+	req.AddCookie(&http.Cookie{Name: cookie.CookieName, Value: value}) // Устанавливаем куку
+
+	// Установим mock, чтобы он возвращал ошибку
+	mockStorage.GetDataFunc = func(userID int) ([]storage.UserData, error) {
+		return nil, errors.New("данные не найдены") // Симулируем ошибку при получении данных
+	}
+
+	_, err := userService.GetData(req)
+	if err == nil {
+		t.Error("Expected error when fetching data, got none")
+	}
+}
+
 func TestUserService_DeleteData(t *testing.T) {
 	mockStorage := NewMockUserStorage()
 	mockStorage.SaveUser("testuser", "password123") // Сохраняем пользователя
@@ -362,6 +412,81 @@ func TestUserService_DeleteData(t *testing.T) {
 	// Проверяем, что данные были удалены
 	if _, err := mockStorage.GetData(userID); err == nil {
 		t.Error("Expected no data after delete, but data still exists")
+	}
+}
+
+func TestUserService_DeleteData_NoCookie(t *testing.T) {
+	mockStorage := &MockUserStorage{
+		DeleteDataFunc: func(userID int, dataID int) error {
+			return nil // Симулируем успешное удаление
+		},
+	}
+
+	userService := NewUserService(mockStorage)
+
+	req := httptest.NewRequest("DELETE", "/deletedata?id=1", failingReadCloser{})
+
+	err := userService.DeleteData(req)
+	if err == nil {
+		t.Error("Expected error due to missing cookie, got none")
+	}
+}
+
+func TestUserService_DeleteData_InvalidUserID(t *testing.T) {
+	mockStorage := &MockUserStorage{
+		DeleteDataFunc: func(userID int, dataID int) error {
+			return nil // Симулируем успешное удаление
+		},
+	}
+
+	userService := NewUserService(mockStorage)
+
+	req := httptest.NewRequest("DELETE", "/deletedata?id=1", nil)
+	req.AddCookie(&http.Cookie{Name: cookie.CookieName, Value: "invalid_cookie"}) // Устанавливаем невалидную куку
+
+	err := userService.DeleteData(req)
+	if err == nil {
+		t.Error("Expected error when decrypting userID, got none")
+	}
+}
+
+func TestUserService_DeleteData_InvalidDataID(t *testing.T) {
+	mockStorage := &MockUserStorage{
+		DeleteDataFunc: func(userID int, dataID int) error {
+			return nil // Симулируем успешное удаление
+		},
+	}
+
+	userService := NewUserService(mockStorage)
+
+	req := httptest.NewRequest("DELETE", "/deletedata?id=notanint", nil) // Неверный dataID
+	value, _ := storage.Encrypt("123")
+	value = value + ".123"
+	req.AddCookie(&http.Cookie{Name: cookie.CookieName, Value: value}) // Устанавливаем куку
+
+	err := userService.DeleteData(req)
+	if err == nil {
+		t.Error("Expected error due to invalid dataID, got none")
+	}
+}
+
+func TestUserService_DeleteData_StorageError(t *testing.T) {
+	mockStorage := &MockUserStorage{
+		DeleteDataFunc: func(userID int, dataID int) error {
+			return errors.New("ошибка при удалении данных") // Симулируем ошибку
+		},
+	}
+
+	userService := NewUserService(mockStorage)
+
+	req := httptest.NewRequest("DELETE", "/deletedata?id=1", nil)
+	value, _ := storage.Encrypt("123")
+	value = value + ".123"
+	req.AddCookie(&http.Cookie{Name: cookie.CookieName, Value: value}) // Устанавливаем куку
+
+	err := userService.DeleteData(req)
+	if err == nil || err.Error() != "произошла ошибка при удалении данных" {
+		t.Errorf("Expected error during delete, got: %v", err)
 	}
 }
 
@@ -389,5 +514,111 @@ func TestUserService_EditData(t *testing.T) {
 	editedData, _ := mockStorage.GetData(userID)
 	if string(editedData[0].UserData) != "edited data" {
 		t.Errorf("Expected 'edited data', got '%s'", editedData[0].UserData)
+	}
+}
+
+func TestUserService_EditData_RequestBodyError(t *testing.T) {
+	mockStorage := &MockUserStorage{
+		EditDataFunc: func(userID int, body []byte, dataType string, dataID int) error {
+			return nil
+		},
+	}
+
+	userService := NewUserService(mockStorage)
+
+	req := httptest.NewRequest("PUT", "/editdata", failingReadCloser{})
+
+	err := userService.EditData(req)
+	if err == nil {
+		t.Error("Expected error due to empty request body, got none")
+	}
+}
+
+// failingReadCloser - это структура, которая возвращает ошибку при чтении тела
+type failingReadCloser struct{}
+
+func (failingReadCloser) Read([]byte) (int, error) {
+	return 0, errors.New("ошибка чтения тела запроса")
+}
+
+func TestUserService_EditData_NoCookie(t *testing.T) {
+	mockStorage := &MockUserStorage{
+		EditDataFunc: func(userID int, body []byte, dataType string, dataID int) error {
+			return nil
+		},
+	}
+
+	userService := NewUserService(mockStorage)
+
+	data := []byte("sample data")
+	req := httptest.NewRequest("PUT", "/editdata", bytes.NewBuffer(data)) // Не добавляем куку
+
+	err := userService.EditData(req)
+	if err == nil {
+		t.Error("Expected error due to missing cookie, got none")
+	}
+}
+
+func TestUserService_EditData_InvalidUserID(t *testing.T) {
+	mockStorage := &MockUserStorage{
+		EditDataFunc: func(userID int, body []byte, dataType string, dataID int) error {
+			return nil
+		},
+	}
+
+	userService := NewUserService(mockStorage)
+
+	cookieValue := "invalid_cookie" // Некорректный кука
+	req := httptest.NewRequest("PUT", "/editdata", bytes.NewBuffer([]byte("data")))
+	req.AddCookie(&http.Cookie{Name: cookie.CookieName, Value: cookieValue}) // Добавляем куку
+
+	err := userService.EditData(req)
+	if err == nil {
+		t.Error("Expected error when decrypting userID, got none")
+	}
+}
+
+func TestUserService_EditData_InvalidDataID(t *testing.T) {
+	mockStorage := &MockUserStorage{
+		EditDataFunc: func(userID int, body []byte, dataType string, dataID int) error {
+			return nil
+		},
+	}
+
+	userService := NewUserService(mockStorage)
+
+	req := httptest.NewRequest("PUT", "/editdata", bytes.NewBuffer([]byte("data")))
+	value, _ := storage.Encrypt("123")
+	value = value + ".123"
+	req.AddCookie(&http.Cookie{Name: cookie.CookieName, Value: value}) // Устанавливаем куку
+
+	// Устанавливаем невалидный ID в заголовок
+	req.Header.Set("Data-Id", "invalid_id")
+
+	err := userService.EditData(req)
+	if err == nil {
+		t.Error("Expected error due to invalid dataID, got none")
+	}
+}
+
+func TestUserService_EditData_StorageError(t *testing.T) {
+	mockStorage := &MockUserStorage{
+		EditDataFunc: func(userID int, body []byte, dataType string, dataID int) error {
+			return errors.New("ошибка при редактировании") // Симулируем ошибку при редактировании данных
+		},
+	}
+
+	userService := NewUserService(mockStorage)
+
+	// Создаем запрос
+	req := httptest.NewRequest("PUT", "/editdata", bytes.NewBuffer([]byte("data")))
+	value, _ := storage.Encrypt("123")
+	value = value + ".123"
+	req.AddCookie(&http.Cookie{Name: cookie.CookieName, Value: value}) // Устанавливаем куку
+	req.Header.Set("Data-Id", "1")                                     // Указываем ID данных для редактирования
+
+	err := userService.EditData(req)
+	if err == nil || err.Error() != "произошла ошибка при измнении данных" {
+		t.Errorf("Expected specific error, got %v", err)
 	}
 }

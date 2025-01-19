@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 )
@@ -77,14 +76,6 @@ func (cs *Configuration) InitConfig() (*ConfigData, error) {
 
 	if DatabaseDsn := os.Getenv("DATABASE_DSN"); DatabaseDsn != "" {
 		cfg.DatabaseDsn = DatabaseDsn
-	}
-
-	if cfg.ServerAddress == "" {
-		return nil, fmt.Errorf("ServerAddress is required")
-	}
-
-	if cfg.BaseURL == "" {
-		return nil, fmt.Errorf("BaseURL is required")
 	}
 
 	return cfg, nil
