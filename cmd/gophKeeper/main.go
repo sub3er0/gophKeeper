@@ -1,0 +1,127 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"github.com/go-chi/chi/v5"
+	"gophKeeper/internal/config"
+	"gophKeeper/internal/cookie"
+	"gophKeeper/internal/gophkeeper"
+	"gophKeeper/internal/service"
+	"gophKeeper/internal/storage"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+)
+
+var gophKeeperInstance *gophkeeper.GophKeeper
+
+func main() {
+	cfg := config.Configuration{}
+	err := cfg.InitConfig()
+
+	if err != nil {
+		log.Fatalf("Error while initializing cfg: %v", err)
+	}
+
+	var dataUsersStorage storage.UserStorageInterface
+	dataUsersStorage = &storage.UsersStorage{}
+	dataUsersStorage.Init(cfg.DatabaseDsn)
+	migrations(&cfg)
+
+	cookieManager := cookie.CookieManager{
+		Storage: dataUsersStorage,
+	}
+
+	server := &http.Server{}
+
+	idleConnsClosed := make(chan struct{})
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	go func() {
+		<-sigint
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(ctx); err != nil {
+			// ошибки закрытия Listener
+			log.Printf("HTTP server Shutdown: %v", err)
+		}
+
+		close(idleConnsClosed)
+	}()
+
+	userService := service.NewUserService(dataUsersStorage)
+	gophKeeperInstance = &gophkeeper.GophKeeper{
+		Storage:       dataUsersStorage,
+		ServerAddress: cfg.ServerAddress,
+		BaseURL:       cfg.BaseURL,
+		CookieManager: &cookieManager,
+		UserService:   userService,
+	}
+
+	initHTTPServer(&cookieManager, &cfg, server)
+
+	<-idleConnsClosed
+
+	fmt.Println("Server Shutdown gracefully")
+}
+
+func migrations(cfg *config.Configuration) {
+	dsn := cfg.DatabaseDsn
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+
+	if err != nil {
+		log.Fatalf("Failed to connect database: %v", err)
+	}
+
+	err = db.AutoMigrate(storage.Users{})
+
+	if err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
+	err = db.AutoMigrate(storage.UserCookie{})
+
+	if err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
+	err = db.AutoMigrate(storage.UserData{})
+
+	if err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
+}
+
+func initHTTPServer(
+	cookieManager *cookie.CookieManager,
+	cfg *config.Configuration,
+	server *http.Server,
+) {
+	r := chi.NewRouter()
+	r.With(cookieManager.CookieHandler).Route("/", func(r chi.Router) {
+		r.Post("/add_data", gophKeeperInstance.AddDataHandler)
+		r.Get("/get_data", gophKeeperInstance.GetDataHandler)
+		r.Get("/delete_data", gophKeeperInstance.DeleteDataHandler)
+		r.Post("/edit_data", gophKeeperInstance.EditDataHandler)
+	})
+
+	r.Post("/registration", gophKeeperInstance.RegistrationHandler)
+	r.Post("/authentication", gophKeeperInstance.AuthenticationHandler)
+	r.Get("/ping", gophKeeperInstance.PingHandler)
+
+	server.Addr = cfg.ServerAddress
+	server.Handler = r
+	err := server.ListenAndServe()
+
+	if err != nil {
+		log.Printf("Error starting server: %s", err)
+	}
+}
