@@ -705,3 +705,153 @@ func TestEditDataHandler_InvalidDataID(t *testing.T) {
 		t.Errorf("Expected error message in response, got %s", string(bodyBytes))
 	}
 }
+
+// MockResponseWriter это реализация интерфейса http.ResponseWriter
+type MockResponseWriter struct {
+	statusCode int
+	header     http.Header
+	err        error
+}
+
+func (m *MockResponseWriter) Header() http.Header {
+	return m.header
+}
+
+func (m *MockResponseWriter) Write(b []byte) (int, error) {
+	if m.err != nil {
+		return 0, m.err // Вернуть ошибку, если она была установлена
+	}
+	return len(b), nil // Иначе вернуть длину записи
+}
+
+func (m *MockResponseWriter) WriteHeader(statusCode int) {
+	m.statusCode = statusCode
+}
+
+// TestAddDataHandler_WriteError тестирует ошибку записи в ResponseWriter
+func TestAddDataHandler_WriteError(t *testing.T) {
+	// Создаем мок UserService
+	mockUserService := &MockUserService{
+		AddDataFunc: func(r *http.Request) error {
+			return nil // Симулируем успешное добавление данных
+		},
+	}
+
+	// Создаем экземпляр GophKeeper с мок-сервисом
+	gophKeeper := &GophKeeper{
+		UserService: mockUserService,
+	}
+
+	// Создаем тестовый реквест
+	req := httptest.NewRequest("POST", "/add_data", nil)
+
+	// Создаем мок-ответчик с ошибкой
+	mockRec := &MockResponseWriter{
+		header: make(http.Header),
+		err:    errors.New("ошибка при записи"), // Устанавливаем ошибку
+	}
+
+	// Вызываем обработчик
+	gophKeeper.AddDataHandler(mockRec, req)
+
+	// Проверяем статус-код ответа
+	if mockRec.statusCode != http.StatusInternalServerError {
+		t.Errorf("expected status code %d, got %d", http.StatusInternalServerError, mockRec.statusCode)
+	}
+}
+
+// TestGetDataHandler_WriteError тестирует ошибку записи в ResponseWriter
+func TestGetDataHandler_WriteError(t *testing.T) {
+	// Создаем мок UserService
+	mockUserService := &MockUserService{
+		GetDataFunc: func(r *http.Request) ([]storage.UserData, error) {
+			return []storage.UserData{}, nil
+		},
+	}
+
+	// Создаем экземпляр GophKeeper с мок-сервисом
+	gophKeeper := &GophKeeper{
+		UserService: mockUserService,
+	}
+
+	// Создаем тестовый реквест
+	req := httptest.NewRequest("POST", "/get_data", nil)
+
+	// Создаем мок-ответчик с ошибкой
+	mockRec := &MockResponseWriter{
+		header: make(http.Header),
+		err:    errors.New("ошибка при записи"), // Устанавливаем ошибку
+	}
+
+	// Вызываем обработчик
+	gophKeeper.GetDataHandler(mockRec, req)
+
+	// Проверяем статус-код ответа
+	if mockRec.statusCode != http.StatusInternalServerError {
+		t.Errorf("expected status code %d, got %d", http.StatusInternalServerError, mockRec.statusCode)
+	}
+}
+
+// TestDeleteDataHandler_WriteError тестирует ошибку записи в ResponseWriter
+func TestDeleteDataHandler_WriteError(t *testing.T) {
+	// Создаем мок UserService
+	mockUserService := &MockUserService{
+		DeleteDataFunc: func(r *http.Request) error {
+			return nil // Симулируем успешное добавление данных
+		},
+	}
+
+	// Создаем экземпляр GophKeeper с мок-сервисом
+	gophKeeper := &GophKeeper{
+		UserService: mockUserService,
+	}
+
+	// Создаем тестовый реквест
+	req := httptest.NewRequest("POST", "/delete_data", nil)
+
+	// Создаем мок-ответчик с ошибкой
+	mockRec := &MockResponseWriter{
+		header: make(http.Header),
+		err:    errors.New("ошибка при записи"), // Устанавливаем ошибку
+	}
+
+	// Вызываем обработчик
+	gophKeeper.DeleteDataHandler(mockRec, req)
+
+	// Проверяем статус-код ответа
+	if mockRec.statusCode != http.StatusInternalServerError {
+		t.Errorf("expected status code %d, got %d", http.StatusInternalServerError, mockRec.statusCode)
+	}
+}
+
+// TestEditDataHandler_WriteError тестирует ошибку записи в ResponseWriter
+func TestEditDataHandler_WriteError(t *testing.T) {
+	// Создаем мок UserService
+	mockUserService := &MockUserService{
+		EditDataFunc: func(r *http.Request) error {
+			return nil // Симулируем успешное добавление данных
+		},
+	}
+
+	// Создаем экземпляр GophKeeper с мок-сервисом
+	gophKeeper := &GophKeeper{
+		UserService: mockUserService,
+	}
+
+	// Создаем тестовый реквест
+	req := httptest.NewRequest("POST", "/edit_data", nil)
+
+	// Создаем мок-ответчик с ошибкой
+	mockRec := &MockResponseWriter{
+		header: make(http.Header),
+		err:    errors.New("ошибка при записи"), // Устанавливаем ошибку
+	}
+
+	// Вызываем обработчик
+	gophKeeper.EditDataHandler(mockRec, req)
+
+	// Проверяем статус-код ответа
+	if mockRec.statusCode != http.StatusInternalServerError {
+		t.Errorf("expected status code %d, got %d", http.StatusInternalServerError, mockRec.statusCode)
+	}
+}

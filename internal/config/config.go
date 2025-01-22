@@ -53,7 +53,7 @@ func (cs *Configuration) InitConfig() error {
 		flag.StringVar(&cs.ServerAddress, "a", "localhost:8080", "Адрес HTTP-сервера")
 		flag.StringVar(
 			&cs.DatabaseDsn,
-			"d", "postgres://postgres:326717@localhost:5432/gophkeeper?sslmode=disable",
+			"d", "",
 			"Строка подключения к базе данных")
 
 		flag.Parse()
