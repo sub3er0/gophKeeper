@@ -22,17 +22,17 @@ import (
 var gophKeeperInstance *gophkeeper.GophKeeper
 
 func main() {
-	configuration := config.Configuration{}
-	cfg, err := configuration.InitConfig()
+	cfg := config.Configuration{}
+	err := cfg.InitConfig()
 
 	if err != nil {
-		log.Fatalf("Error while initializing configuration: %v", err)
+		log.Fatalf("Error while initializing cfg: %v", err)
 	}
 
 	var dataUsersStorage storage.UserStorageInterface
 	dataUsersStorage = &storage.UsersStorage{}
 	dataUsersStorage.Init(cfg.DatabaseDsn)
-	migrations(cfg)
+	migrations(&cfg)
 
 	cookieManager := cookie.CookieManager{
 		Storage: dataUsersStorage,
@@ -66,14 +66,14 @@ func main() {
 		UserService:   userService,
 	}
 
-	initHTTPServer(&cookieManager, cfg, server)
+	initHTTPServer(&cookieManager, &cfg, server)
 
 	<-idleConnsClosed
 
 	fmt.Println("Server Shutdown gracefully")
 }
 
-func migrations(cfg *config.ConfigData) {
+func migrations(cfg *config.Configuration) {
 	dsn := cfg.DatabaseDsn
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
@@ -102,7 +102,7 @@ func migrations(cfg *config.ConfigData) {
 
 func initHTTPServer(
 	cookieManager *cookie.CookieManager,
-	cfg *config.ConfigData,
+	cfg *config.Configuration,
 	server *http.Server,
 ) {
 	r := chi.NewRouter()

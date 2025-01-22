@@ -7,9 +7,16 @@ import (
 	"os"
 )
 
-// ConfigData представляет конфигурацию приложения.
-// Это структура содержит параметры, необходимые для настройки серверного приложения.
-type ConfigData struct {
+// isParsed отслеживает, выполнена ли обработка аргументов командной строки.
+var isParsed bool
+
+// ConfigurationInterface интерфейс, в рамках проекта используется для моков юинт тестов
+type ConfigurationInterface interface {
+	InitConfig() error
+}
+
+// Configuration структура конфигурации, реализующая интерфейс ConfigurationInterface
+type Configuration struct {
 	// ServerAddress определяет адрес HTTP-сервера, на котором будет работать приложение.
 	ServerAddress string `json:"server_address"`
 
@@ -20,21 +27,8 @@ type ConfigData struct {
 	DatabaseDsn string `json:"database_dsn"`
 }
 
-// isParsed отслеживает, выполнена ли обработка аргументов командной строки.
-var isParsed bool
-
-// ConfigurationInterface интерфейс, в рамках проекта используется для моков юинт тестов
-type ConfigurationInterface interface {
-	InitConfig() (*ConfigData, error)
-}
-
-// Configuration структура конфигурации, реализующая интерфейс ConfigurationInterface
-type Configuration struct{}
-
 // InitConfig инициализирует конфигурацию приложения.
-func (cs *Configuration) InitConfig() (*ConfigData, error) {
-	cfg := &ConfigData{}
-
+func (cs *Configuration) InitConfig() error {
 	configFile := os.Getenv("CONFIG")
 	if configFile == "" {
 		configFile = "config.json"
@@ -48,18 +42,18 @@ func (cs *Configuration) InitConfig() (*ConfigData, error) {
 		isParsed = true
 		defer file.Close()
 
-		if err = json.NewDecoder(file).Decode(cfg); err != nil {
+		if err = json.NewDecoder(file).Decode(cs); err != nil {
 			log.Printf("Warning: Error decoding config file: %v. Using default configuration.\n", err)
-			return nil, err
+			return err
 		}
 	}
 
 	if !isParsed {
-		flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080/", "Базовый адрес для сокращенных URL")
-		flag.StringVar(&cfg.ServerAddress, "a", "localhost:8080", "Адрес HTTP-сервера")
+		flag.StringVar(&cs.BaseURL, "b", "http://localhost:8080/", "Базовый адрес для сокращенных URL")
+		flag.StringVar(&cs.ServerAddress, "a", "localhost:8080", "Адрес HTTP-сервера")
 		flag.StringVar(
-			&cfg.DatabaseDsn,
-			"d", "",
+			&cs.DatabaseDsn,
+			"d", "postgres://postgres:326717@localhost:5432/gophkeeper?sslmode=disable",
 			"Строка подключения к базе данных")
 
 		flag.Parse()
@@ -67,16 +61,16 @@ func (cs *Configuration) InitConfig() (*ConfigData, error) {
 	}
 
 	if ServerAddress := os.Getenv("SERVER_ADDRESS"); ServerAddress != "" {
-		cfg.ServerAddress = ServerAddress
+		cs.ServerAddress = ServerAddress
 	}
 
 	if BaseURL := os.Getenv("BASE_URL"); BaseURL != "" {
-		cfg.BaseURL = BaseURL
+		cs.BaseURL = BaseURL
 	}
 
 	if DatabaseDsn := os.Getenv("DATABASE_DSN"); DatabaseDsn != "" {
-		cfg.DatabaseDsn = DatabaseDsn
+		cs.DatabaseDsn = DatabaseDsn
 	}
 
-	return cfg, nil
+	return nil
 }

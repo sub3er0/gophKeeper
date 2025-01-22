@@ -35,8 +35,8 @@ func TestInitConfigFromFile(t *testing.T) {
 
 	os.Setenv("CONFIG", tempFile)
 
-	config := Configuration{}
-	cfg, err := config.InitConfig()
+	cfg := Configuration{}
+	err = cfg.InitConfig()
 	if err != nil {
 		t.Fatalf("Неожиданная ошибка: %v", err)
 	}
@@ -62,8 +62,8 @@ func TestInitConfigFromEnv(t *testing.T) {
 	defer os.Unsetenv("DATABASE_DSN")
 
 	// Инициализация конфигурации
-	config := Configuration{}
-	cfg, err := config.InitConfig()
+	cfg := Configuration{}
+	err := cfg.InitConfig()
 	if err != nil {
 		t.Fatalf("Неожиданная ошибка: %v", err)
 	}
@@ -83,8 +83,8 @@ func TestInitConfig_UsingDefaultValues(t *testing.T) {
 	isParsed = false
 	os.Unsetenv("CONFIG")
 
-	config := Configuration{}
-	cfg, err := config.InitConfig()
+	cfg := Configuration{}
+	err := cfg.InitConfig()
 
 	if err != nil {
 		t.Fatalf("Неожиданная ошибка: %v", err)
@@ -119,7 +119,7 @@ func TestInitConfigWithInvalidJSON(t *testing.T) {
 	os.Setenv("CONFIG", tempFile)
 
 	config := Configuration{}
-	_, err = config.InitConfig()
+	err = config.InitConfig()
 	if err == nil {
 		t.Fatalf("Ожидалась ошибка, но она не произошла")
 	}
